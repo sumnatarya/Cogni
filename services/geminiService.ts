@@ -47,7 +47,7 @@ export const analyzeContent = async (
           }
         }
       },
-      scientificRationale: { type: Type.STRING, description: "A brief explanation citing learning science principles (e.g., Ebbinghaus curve, interleaving) justifying this specific plan." }
+      scientificRationale: { type: Type.STRING, description: "A concise explanation (max 2 sentences) citing learning science principles." }
     },
     required: ["topic", "estimatedMinutesTotal", "recommendedRepetitions", "difficultyRating", "keyConcepts", "studyPlan", "scientificRationale"]
   };
@@ -69,7 +69,7 @@ export const analyzeContent = async (
   // Add text prompt
   const systemPrompt = `
     You are a world-class Cognitive Science and Learning Expert. 
-    Analyze the provided content.
+    Analyze the provided content to create a study plan.
     
     Goal: Create the most efficient study plan based on Information Density, Complexity, and the Forgetting Curve.
     
@@ -79,7 +79,9 @@ export const analyzeContent = async (
     - Session 3: +2 Days (Day 3) - Interleaving/Application.
     - Session 4: +4 Days (Day 7) - Final Review.
     
-    Output a structured JSON plan. Be concise.
+    IMPORTANT: 
+    - Keep "scientificRationale" short and concise.
+    - Ensure the JSON output is complete and valid.
   `;
 
   const userPrompt = textInput ? `Analyze this text: ${textInput}` : `Analyze the attached file content.`;
@@ -98,14 +100,19 @@ export const analyzeContent = async (
         responseMimeType: "application/json",
         responseSchema: responseSchema,
         temperature: 0.3,
-        maxOutputTokens: 2000, // Limit tokens for faster response
+        maxOutputTokens: 8192, // Increased from 2000 to prevent JSON truncation
       }
     });
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response from AI");
     
-    return JSON.parse(jsonText) as LearningAnalysis;
+    try {
+        return JSON.parse(jsonText) as LearningAnalysis;
+    } catch (parseError) {
+        console.error("JSON Parse Error. Raw text:", jsonText);
+        throw new Error("JSON_PARSE_ERROR");
+    }
 
   } catch (error: any) {
     console.error("Gemini Analysis Error:", error);
@@ -116,6 +123,9 @@ export const analyzeContent = async (
     }
     if (error.message?.includes('400')) {
         throw new Error("BAD_REQUEST");
+    }
+    if (error.message === "JSON_PARSE_ERROR") {
+        throw new Error("PARSING_ERROR");
     }
     
     throw new Error("GENERIC_ERROR");

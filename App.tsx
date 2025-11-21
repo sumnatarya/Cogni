@@ -4,6 +4,7 @@ import { InputSection } from './components/InputSection';
 import { ResultsDashboard } from './components/ResultsDashboard';
 import { analyzeContent } from './services/geminiService';
 import { LearningAnalysis, FileData } from './types';
+import { Trash2 } from 'lucide-react';
 
 const STORAGE_KEY = 'cogniplan_last_result';
 
@@ -42,12 +43,20 @@ function App() {
         setErrorMsg("Access Denied: The provided API Key is invalid or expired.");
       } else if (error.message === "BAD_REQUEST") {
          setErrorMsg("The content provided could not be processed. Please try shorter text or a different file.");
+      } else if (error.message === "PARSING_ERROR") {
+          setErrorMsg("The AI response was incomplete. Please try again with slightly shorter content.");
       } else {
         setErrorMsg("An unexpected error occurred while communicating with the AI. Please try again.");
       }
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleClear = () => {
+      setAnalysisResult(null);
+      localStorage.removeItem(STORAGE_KEY);
+      setErrorMsg(null);
   };
 
   return (
@@ -67,7 +76,7 @@ function App() {
         </div>
 
         {/* Input Section */}
-        <div className="mb-12">
+        <div className="mb-12 relative">
           <InputSection 
             onAnalyze={handleAnalyze} 
             isAnalyzing={isAnalyzing} 
@@ -77,12 +86,21 @@ function App() {
 
         {/* Results Section */}
         {analysisResult && (
-          <div id="results" className="scroll-mt-20">
-             <div className="flex items-center mb-6">
+          <div id="results" className="scroll-mt-20 animate-fade-in">
+             <div className="flex items-center mb-6 gap-4">
                <div className="h-px bg-slate-200 flex-1"></div>
                <span className="px-4 text-sm font-medium text-slate-400 uppercase tracking-widest">Your Optimized Plan</span>
                <div className="h-px bg-slate-200 flex-1"></div>
+               <button 
+                 onClick={handleClear}
+                 className="text-xs flex items-center text-slate-400 hover:text-red-500 transition-colors"
+                 title="Clear current plan"
+               >
+                 <Trash2 className="w-4 h-4 mr-1" />
+                 Clear
+               </button>
              </div>
+             
              <h3 className="text-2xl font-display font-bold text-slate-800 mb-6 text-center">
                Learning Plan: {analysisResult.topic}
              </h3>
