@@ -1,0 +1,5 @@
+{
+  "name": "CogniPlan",
+  "description": "A science-backed study planner that analyzes your learning materials (text, audio, images) and generates an optimized schedule using Spaced Repetition and Active Recall principles.",
+  "requestFramePermissions": []
+}
