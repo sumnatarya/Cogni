@@ -6,6 +6,7 @@ export enum InputMode {
 export interface StudySession {
   sessionNumber: number;
   intervalLabel: string; // e.g., "Today", "In 2 days"
+  dayOffset: number; // Days from start date
   method: string; // e.g., "Feynman Technique", "Flashcards"
   focusDescription: string;
   durationMinutes: number;

@@ -2,22 +2,30 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { LearningAnalysis, FileData } from "../types";
 
 // Robustly access env vars across different build environments (Vite, CRA, Next.js, Node)
-const getApiKey = () => {
-  // 1. Check standard process.env (Node/CRA/Next)
-  if (typeof process !== 'undefined' && process.env) {
-    if (process.env.API_KEY) return process.env.API_KEY;
-    if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
-    if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
-    if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+const getApiKey = (): string => {
+  // 1. Check Vite's import.meta.env (Standard for Vite/Vercel)
+  try {
+    // @ts-ignore
+    if (import.meta && import.meta.env && import.meta.env.VITE_API_KEY) {
+      // @ts-ignore
+      return import.meta.env.VITE_API_KEY;
+    }
+  } catch (e) {
+    // Ignore if import.meta is not defined
   }
-  
-  // 2. Check Vite's import.meta.env
-  // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    // @ts-ignore
-    if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-    // @ts-ignore
-    if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+
+  // 2. Check standard process.env (Node/CRA/Next)
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      // Check specific framework prefixes which are often required on Vercel
+      if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+      // Check generic key
+      if (process.env.API_KEY) return process.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore if process is not defined
   }
 
   return '';
@@ -30,7 +38,7 @@ export const analyzeContent = async (
   fileData: FileData | null
 ): Promise<LearningAnalysis> => {
   if (!API_KEY) {
-    console.error("API Key not found in environment variables.");
+    console.error("API Key lookup failed. Checked: VITE_API_KEY, REACT_APP_API_KEY, API_KEY.");
     throw new Error("MISSING_API_KEY");
   }
 
@@ -56,6 +64,7 @@ export const analyzeContent = async (
           properties: {
             sessionNumber: { type: Type.INTEGER },
             intervalLabel: { type: Type.STRING },
+            dayOffset: { type: Type.INTEGER, description: "Number of days from today (e.g., 0, 1, 3, 7)" },
             method: { type: Type.STRING },
             focusDescription: { type: Type.STRING, description: "Very concise instruction (max 15 words)" },
             durationMinutes: { type: Type.NUMBER }
@@ -86,11 +95,12 @@ export const analyzeContent = async (
     STRICT RULES:
     1. Output MUST be valid JSON matching the schema.
     2. Keep all text fields extremely CONCISE to ensure JSON is not cut off.
-    3. Plan Structure:
-       - Session 1: Immediate (Day 0)
-       - Session 2: +1 Day
-       - Session 3: +3 Days
-       - Session 4: +7 Days
+    3. Plan Structure & Offsets:
+       - Session 1: Day 0 (dayOffset: 0)
+       - Session 2: +1 Day (dayOffset: 1)
+       - Session 3: +3 Days (dayOffset: 3)
+       - Session 4: +7 Days (dayOffset: 7)
+       (Adjust based on complexity)
   `;
 
   const userPrompt = textInput ? `Analyze text: ${textInput.substring(0, 20000)}` : `Analyze the file.`;

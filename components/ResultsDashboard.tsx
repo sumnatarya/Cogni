@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Repeat, TrendingUp, BookOpen, Zap, CalendarCheck, Download, CheckCircle2, Circle } from 'lucide-react';
+import { Clock, Repeat, TrendingUp, BookOpen, Zap, CalendarCheck, Download, CheckCircle2, Circle, Calendar } from 'lucide-react';
 import { LearningAnalysis } from '../types';
 import { RetentionChart } from './RetentionChart';
 
@@ -62,6 +62,42 @@ ${data.scientificRationale}
     URL.revokeObjectURL(url);
   };
 
+  const handleCalendarDownload = () => {
+    let icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//CogniPlan//Study Schedule//EN\n`;
+    const today = new Date();
+
+    data.studyPlan.forEach(session => {
+      const sessionDate = new Date(today);
+      // Fallback to rough estimate if dayOffset is missing from older generations
+      const offset = typeof session.dayOffset === 'number' 
+        ? session.dayOffset 
+        : [0, 1, 3, 7, 14, 30][session.sessionNumber - 1] || (session.sessionNumber * 7);
+      
+      sessionDate.setDate(today.getDate() + offset);
+      
+      // Format date YYYYMMDD
+      const dateStr = sessionDate.toISOString().split('T')[0].replace(/-/g, '');
+      
+      icsContent += `BEGIN:VEVENT\n`;
+      icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
+      icsContent += `SUMMARY:Study ${data.topic} - Session ${session.sessionNumber}\n`;
+      icsContent += `DESCRIPTION:Method: ${session.method}\\nFocus: ${session.focusDescription}\\nRepetition #${session.sessionNumber}\n`;
+      icsContent += `END:VEVENT\n`;
+    });
+
+    icsContent += `END:VCALENDAR`;
+
+    const blob = new Blob([icsContent], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CogniPlan-${data.topic.replace(/\s+/g, '_')}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       
@@ -98,18 +134,28 @@ ${data.scientificRationale}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Plan Timeline */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
             <h2 className="text-lg font-display font-bold text-slate-800 flex items-center">
               <CalendarCheck className="w-5 h-5 mr-2 text-brand-500" />
               Optimization Schedule
             </h2>
-            <button 
-              onClick={handleDownload}
-              className="text-sm flex items-center text-brand-600 font-medium hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4 mr-1.5" />
-              Download Plan
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={handleCalendarDownload}
+                className="text-xs flex items-center text-slate-600 font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                title="Add to Calendar (Google/Outlook/Apple)"
+              >
+                <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                Add to Calendar
+              </button>
+              <button 
+                onClick={handleDownload}
+                className="text-xs flex items-center text-brand-600 font-medium bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Text File
+              </button>
+            </div>
           </div>
 
           <div className="relative border-l-2 border-slate-100 ml-3 space-y-8">

@@ -38,7 +38,7 @@ function App() {
       
       // Map error codes to user-friendly messages
       if (error.message === "MISSING_API_KEY") {
-        setErrorMsg("Missing API Key. In Vercel Settings, add an Environment Variable named 'REACT_APP_API_KEY' or 'VITE_API_KEY' with your key value.");
+        setErrorMsg("CONFIGURATION ERROR: API Key is missing. \n\n1. Go to your Vercel Dashboard.\n2. Navigate to Settings > Environment Variables.\n3. Add a new variable named 'VITE_API_KEY' with your Gemini API Key.\n4. IMPORTANT: You must REDEPLOY your project for changes to take effect.");
       } else if (error.message === "INVALID_API_KEY") {
         setErrorMsg("Access Denied: The provided API Key is invalid or expired. Please check your Vercel Environment Variables.");
       } else if (error.message === "BAD_REQUEST") {
