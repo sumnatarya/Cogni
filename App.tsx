@@ -38,15 +38,15 @@ function App() {
       
       // Map error codes to user-friendly messages
       if (error.message === "MISSING_API_KEY") {
-        setErrorMsg("Configuration Error: API Key is missing. Please check your environment settings.");
+        setErrorMsg("Missing API Key. In Vercel Settings, add an Environment Variable named 'REACT_APP_API_KEY' or 'VITE_API_KEY' with your key value.");
       } else if (error.message === "INVALID_API_KEY") {
-        setErrorMsg("Access Denied: The provided API Key is invalid or expired.");
+        setErrorMsg("Access Denied: The provided API Key is invalid or expired. Please check your Vercel Environment Variables.");
       } else if (error.message === "BAD_REQUEST") {
          setErrorMsg("The content provided could not be processed. Please try shorter text or a different file.");
       } else if (error.message === "PARSING_ERROR") {
-          setErrorMsg("The AI response was incomplete. Please try again with slightly shorter content.");
+          setErrorMsg("The AI response was incomplete. Please try again with shorter content to generate a successful plan.");
       } else {
-        setErrorMsg("An unexpected error occurred while communicating with the AI. Please try again.");
+        setErrorMsg("An unexpected error occurred. Please try again.");
       }
     } finally {
       setIsAnalyzing(false);

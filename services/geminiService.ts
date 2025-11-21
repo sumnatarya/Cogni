@@ -1,11 +1,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LearningAnalysis, FileData } from "../types";
 
-// Safely access env vars without crashing in browser environments where 'process' is undefined
+// Robustly access env vars across different build environments (Vite, CRA, Next.js, Node)
 const getApiKey = () => {
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    return process.env.API_KEY;
+  // 1. Check standard process.env (Node/CRA/Next)
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.API_KEY) return process.env.API_KEY;
+    if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+    if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+    if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
   }
+  
+  // 2. Check Vite's import.meta.env
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    // @ts-ignore
+    if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+    // @ts-ignore
+    if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+  }
+
   return '';
 };
 
@@ -16,6 +30,7 @@ export const analyzeContent = async (
   fileData: FileData | null
 ): Promise<LearningAnalysis> => {
   if (!API_KEY) {
+    console.error("API Key not found in environment variables.");
     throw new Error("MISSING_API_KEY");
   }
 
@@ -25,14 +40,14 @@ export const analyzeContent = async (
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      topic: { type: Type.STRING, description: "A concise title for the learning material" },
-      estimatedMinutesTotal: { type: Type.NUMBER, description: "Total active study time required in minutes to master this specific content" },
-      recommendedRepetitions: { type: Type.NUMBER, description: "Number of spaced repetition sessions recommended" },
+      topic: { type: Type.STRING, description: "Short title (max 5 words)" },
+      estimatedMinutesTotal: { type: Type.NUMBER },
+      recommendedRepetitions: { type: Type.NUMBER },
       difficultyRating: { type: Type.STRING, enum: ["Easy", "Moderate", "Complex", "Advanced"] },
       keyConcepts: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: "Top 3-5 key concepts extracted from the material"
+        description: "Top 3-5 key concepts"
       },
       studyPlan: {
         type: Type.ARRAY,
@@ -40,14 +55,14 @@ export const analyzeContent = async (
           type: Type.OBJECT,
           properties: {
             sessionNumber: { type: Type.INTEGER },
-            intervalLabel: { type: Type.STRING, description: "When to study relative to start (e.g., 'Day 1', 'Day 3')" },
-            method: { type: Type.STRING, description: "Specific active learning technique (e.g., Active Recall, Mind Mapping)" },
-            focusDescription: { type: Type.STRING, description: "What specific part to focus on or how to apply the method" },
-            durationMinutes: { type: Type.NUMBER, description: "Length of this specific session" }
+            intervalLabel: { type: Type.STRING },
+            method: { type: Type.STRING },
+            focusDescription: { type: Type.STRING, description: "Very concise instruction (max 15 words)" },
+            durationMinutes: { type: Type.NUMBER }
           }
         }
       },
-      scientificRationale: { type: Type.STRING, description: "A concise explanation (max 2 sentences) citing learning science principles." }
+      scientificRationale: { type: Type.STRING, description: "One concise sentence explaining the schedule." }
     },
     required: ["topic", "estimatedMinutesTotal", "recommendedRepetitions", "difficultyRating", "keyConcepts", "studyPlan", "scientificRationale"]
   };
@@ -56,7 +71,6 @@ export const analyzeContent = async (
 
   // Add file if present
   if (fileData) {
-    // Remove header from base64 string if present (e.g., "data:image/png;base64,")
     const base64Data = fileData.base64.split(',')[1] || fileData.base64;
     parts.push({
       inlineData: {
@@ -66,26 +80,20 @@ export const analyzeContent = async (
     });
   }
 
-  // Add text prompt
   const systemPrompt = `
-    You are a world-class Cognitive Science and Learning Expert. 
-    Analyze the provided content to create a study plan.
+    You are a Cognitive Science Expert. Create a Spaced Repetition study plan.
     
-    Goal: Create the most efficient study plan based on Information Density, Complexity, and the Forgetting Curve.
-    
-    STRICTLY FOLLOW SPACED REPETITION:
-    - Session 1: Immediate (Day 0) - Encoding/Understanding.
-    - Session 2: +1 Day (Day 1) - Active Recall.
-    - Session 3: +2 Days (Day 3) - Interleaving/Application.
-    - Session 4: +4 Days (Day 7) - Final Review.
-    
-    IMPORTANT: 
-    - Keep "scientificRationale" short and concise.
-    - Ensure the JSON output is complete and valid.
+    STRICT RULES:
+    1. Output MUST be valid JSON matching the schema.
+    2. Keep all text fields extremely CONCISE to ensure JSON is not cut off.
+    3. Plan Structure:
+       - Session 1: Immediate (Day 0)
+       - Session 2: +1 Day
+       - Session 3: +3 Days
+       - Session 4: +7 Days
   `;
 
-  const userPrompt = textInput ? `Analyze this text: ${textInput}` : `Analyze the attached file content.`;
-
+  const userPrompt = textInput ? `Analyze text: ${textInput.substring(0, 20000)}` : `Analyze the file.`;
   parts.push({ text: userPrompt });
 
   try {
@@ -99,8 +107,8 @@ export const analyzeContent = async (
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        temperature: 0.3,
-        maxOutputTokens: 8192, // Increased from 2000 to prevent JSON truncation
+        temperature: 0.2,
+        maxOutputTokens: 8192,
       }
     });
 
@@ -117,7 +125,6 @@ export const analyzeContent = async (
   } catch (error: any) {
     console.error("Gemini Analysis Error:", error);
     
-    // Handle common API errors
     if (error.message?.includes('403') || error.message?.includes('API key')) {
       throw new Error("INVALID_API_KEY");
     }
@@ -126,6 +133,9 @@ export const analyzeContent = async (
     }
     if (error.message === "JSON_PARSE_ERROR") {
         throw new Error("PARSING_ERROR");
+    }
+    if (error.message === "MISSING_API_KEY") {
+        throw error;
     }
     
     throw new Error("GENERIC_ERROR");
