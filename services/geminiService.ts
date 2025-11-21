@@ -1,7 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LearningAnalysis, FileData } from "../types";
 
-const API_KEY = process.env.API_KEY || '';
+// Safely access env vars without crashing in browser environments where 'process' is undefined
+const getApiKey = () => {
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  return '';
+};
+
+const API_KEY = getApiKey();
 
 export const analyzeContent = async (
   textInput: string, 
